@@ -1,3 +1,5 @@
 secrets.txt
 hackernews.db
 chat_history/
+schema_snapshots/*.json
+__pycache__/

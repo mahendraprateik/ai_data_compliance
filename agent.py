@@ -1,7 +1,8 @@
-"""Basic LangGraph agent powered by ChatGPT.
+"""LangGraph agent powered by ChatGPT with PII detection tools.
 
 Reads the OpenAI API key from secrets.txt in the same directory.
 Persists chat history across sessions in the chat_history/ folder.
+Includes database, PII detection, and schema monitoring tools.
 """
 
 import json
@@ -10,7 +11,10 @@ from datetime import datetime
 from pathlib import Path
 
 from langchain_openai import ChatOpenAI
-from langgraph.graph import START, MessagesState, StateGraph
+from langgraph.graph import START, END, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode
+
+from tools import ALL_TOOLS
 
 # Load API key from secrets.txt
 # Supports both bare key ("sk-...") and "OPENAI_API_KEY=sk-..." formats
@@ -26,16 +30,27 @@ os.environ["OPENAI_API_KEY"] = api_key
 CHAT_HISTORY_DIR = Path(__file__).parent / "chat_history"
 SHORT_TERM_MEMORY_LIMIT = 50  # max past messages to reload as context
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+llm = ChatOpenAI(model="gpt-4o-mini").bind_tools(ALL_TOOLS)
 
 
 def chatbot(state: MessagesState):
     return {"messages": [llm.invoke(state["messages"])]}
 
 
+def _route_after_chatbot(state: MessagesState) -> str:
+    """Route to tools node if the LLM requested a tool call, otherwise end."""
+    last = state["messages"][-1]
+    if hasattr(last, "tool_calls") and last.tool_calls:
+        return "tools"
+    return END
+
+
 graph = StateGraph(MessagesState)
 graph.add_node("chatbot", chatbot)
+graph.add_node("tools", ToolNode(ALL_TOOLS))
 graph.add_edge(START, "chatbot")
+graph.add_conditional_edges("chatbot", _route_after_chatbot, {"tools": "tools", END: END})
+graph.add_edge("tools", "chatbot")
 agent = graph.compile()
 
 
@@ -67,8 +82,13 @@ def save_session(messages: list[dict]) -> None:
 
 
 def main():
-    print("LangGraph Agent (type 'quit' to exit)")
-    print("-" * 40)
+    print("LangGraph Agent with PII Tools (type 'quit' to exit)")
+    print("-" * 50)
+    print("Try: 'Scan the database for PII'")
+    print("     'What tables are in the database?'")
+    print("     'Run a full PII audit'")
+    print("     'Show me all date fields in the database'")
+    print("-" * 50)
 
     past_messages = load_history()
     if past_messages:

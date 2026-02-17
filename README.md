@@ -38,7 +38,7 @@ The data is loaded into a local SQLite database (`hackernews.db`) in a single ta
 ## Setup
 
 ```bash
-pip install datasets pandas langgraph langchain-openai
+pip install -r requirements.txt
 ```
 
 Add your OpenAI API key to `secrets.txt`:
@@ -54,7 +54,45 @@ python setup_data.py --limit 50000   # 50k rows for quick testing
 python setup_data.py                  # full dataset (~41M rows)
 ```
 
-**Run the agent:**
+**Run the chatbot agent (with PII tools):**
 ```bash
 python agent.py
+```
+
+The agent can answer questions like:
+- "Scan the database for PII"
+- "What tables are in the database?"
+- "Show me all date fields in the database"
+- "Run a full PII audit"
+- "Compare schema to last snapshot"
+
+**Run the ambient PII monitor:**
+```bash
+python monitor.py                        # single run
+python monitor.py --full-scan            # full PII scan of all tables
+python monitor.py --loop                 # continuous monitoring (every 5 min)
+python monitor.py --loop --interval 60   # continuous monitoring (every 60 sec)
+```
+
+Results are stored in the `pii_audit_log` table in the SQLite database.
+
+## Project Structure
+
+```
+├── agent.py               # LangGraph chatbot with PII/DB tools
+├── setup_data.py          # Dataset download and SQLite ingestion
+├── monitor.py             # Ambient PII monitor entry point
+├── requirements.txt       # Python dependencies
+├── secrets.txt            # OpenAI API key (gitignored)
+├── hackernews.db          # SQLite database (gitignored)
+├── tools/
+│   ├── __init__.py        # Exports ALL_TOOLS
+│   ├── db_tools.py        # Database inspection tools
+│   ├── pii_tools.py       # PII detection tools
+│   └── schema_monitor.py  # Schema change detection tools
+├── graphs/
+│   └── pii_monitor.py     # LangGraph monitoring graph
+├── schema_snapshots/      # Schema snapshot JSON files
+│   └── .gitkeep
+└── chat_history/          # Persisted chat sessions (gitignored)
 ```
